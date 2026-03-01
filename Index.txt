@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alice in Puzzleland - Story Rich Edition</title>
+    <style>
+        :root {
+            --alice-blue: #a0d8ef;
+            --heart-red: #e63946;
+            --panel-bg: rgba(255, 255, 255, 0.95);
+            --text-dark: #2b2d42;
+            --hint-gold: #ffcc00;
+            --mission-glow: #00ffcc;
+            --gift-pink: #ff69b4;
+            --retry-blue: #4facfe;
+            --clear-gold: #ffd700;
+            
+            --p-color-1: #e1f5fe;
+            --p-color-2: #fffde7;
+            --p-color-3: #f3e5f5;
+            --p-color-4: #fff1f3;
+            --p-color-5: #f1f8e9;
+            --p-color-6: #fff8e1;
+            --p-color-7: #f5f5f5;
+
+            --bg-top: #ffd700;
+            --bg-bottom: #a0d8ef;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'serif', 'Hiragino Mincho ProN', 'MS PMincho', serif;
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+            overflow: hidden;
+            height: 100vh;
+            background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+            transition: background 2s ease;
+        }
+
+        #game-screen {
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+            visibility: hidden;
+        }
+
+        #dialogue-area {
+            background: var(--panel-bg);
+            margin-bottom: 8px;
+            padding: 12px;
+            border-radius: 12px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            border: 3px solid #888;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .speaker-emoji { font-size: 2.2rem; margin-right: 12px; flex-shrink: 0; background: #fff; border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; border: 2px solid #ccc; }
+        .quote-text { font-style: normal; font-size: 0.85rem; flex: 1; line-height: 1.4; font-weight: bold; }
+
+        header {
+            background: var(--panel-bg);
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 8px;
+        }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+
+        #hint-btn {
+            background: var(--hint-gold);
+            border: 2px solid #b8860b;
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #timer-container {
+            width: 100%;
+            height: 24px;
+            background: #333;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 2px solid #fff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            transition: width 0.1s linear;
+        }
+
+        #timer-text-overlay {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            line-height: 24px;
+            z-index: 2;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+            padding: 6px;
+            border-radius: 10px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        .tile {
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 26px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s;
+            position: relative;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+
+        .tile.selected { transform: scale(1.1); outline: 3px solid var(--hint-gold); z-index: 10; }
+        
+        .tile.hint-highlight {
+            animation: hint-pulse 0.5s ease-in-out infinite alternate;
+            z-index: 5;
+            outline: 4px solid var(--hint-gold);
+        }
+        @keyframes hint-pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+
+        .tile.last-target-glow { animation: target-glow 1s ease-in-out infinite; border: 2px solid var(--mission-glow); }
+        @keyframes target-glow { 0%, 100% { box-shadow: 0 0 5px var(--mission-glow); } 50% { box-shadow: 0 0 15px var(--mission-glow); } }
+
+        .tile.gift-panel { background: #fff0f5 !important; animation: gift-shake 1.5s ease-in-out infinite; border: 2px solid var(--gift-pink); z-index: 20; }
+        @keyframes gift-shake { 0%, 100% { transform: scale(1) rotate(0); } 10%, 20% { transform: scale(1.1) rotate(-3deg); } 30%, 50%, 70% { transform: scale(1.1) rotate(3deg); } 40%, 60% { transform: scale(1.1) rotate(-3deg); } 80% { transform: scale(1) rotate(0); } }
+
+        .tile.eliminating { animation: pop 0.3s forwards; pointer-events: none; }
+        @keyframes pop { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
+
+        #story-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .btn-start {
+            background: var(--heart-red);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 6px 0 #9d252f;
+            min-width: 250px;
+        }
+
+        .btn-retry {
+            background: var(--retry-blue);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 6px 0 #3a8ccb;
+            min-width: 250px;
+            display: none;
+        }
+
+        .mission-item {
+            background: #fff;
+            padding: 4px 10px;
+            border-radius: 15px;
+            border: 2px solid #ccc;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--text-dark);
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            z-index: 1000;
+            top: -10px;
+            animation: confetti-fall 3s linear forwards;
+        }
+        @keyframes confetti-fall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+        .celebrate-text { animation: bounce 1s infinite alternate; color: var(--clear-gold); }
+        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
+    </style>
+</head>
+<body>
+
+<div id="game-screen">
+    <div id="dialogue-area">
+        <div class="speaker-emoji" id="speaker-emoji">👱🏻‍♀️</div>
+        <div class="quote-text" id="quote-text">...</div>
+    </div>
+
+    <header>
+        <div class="header-top">
+            <button id="hint-btn">💡 ヒント (3)</button>
+            <div style="text-align:center">
+                <div id="stage-num-label" style="font-size:12px; opacity:0.7">Stage 1</div>
+                <div id="stage-name" class="stage-title" style="font-weight:bold">...</div>
+            </div>
+            <div style="font-weight:bold">Score: <span id="score-num">0</span></div>
+        </div>
+        <div id="mission-list" style="display:flex; justify-content:center; gap:8px; margin-top:10px; flex-wrap: wrap;"></div>
+    </header>
+
+    <div id="timer-container">
+        <div id="timer-text-overlay"><span id="time-left-val">60</span>s</div>
+        <div id="timer-bar"></div>
+    </div>
+
+    <div id="board"></div>
+</div>
+
+<div id="story-overlay">
+    <div id="story-icon" style="font-size:5rem; margin-bottom: 10px;">🐇</div>
+    <h1 id="story-title" style="margin: 0 0 10px 0;">不思議の国のアリス</h1>
+    <p id="story-text" style="font-size: 1.1rem; line-height: 1.6; max-width: 450px; min-height: 60px; margin: 0;"></p>
+    <div id="instruction-area" style="font-size: 0.9rem; margin-top: 20px; opacity: 0.8;"></div>
+    <button id="main-action-btn" class="btn-start">ゲームを始める</button>
+    <button id="retry-btn" class="btn-retry">このステージをやり直す</button>
+</div>
+
+<script>
+    const COLOR_PALETTE = [
+        'var(--p-color-1)', 'var(--p-color-2)', 'var(--p-color-3)', 
+        'var(--p-color-4)', 'var(--p-color-5)', 'var(--p-color-6)', 
+        'var(--p-color-7)'
+    ];
+
+    const BG_TIME_COLORS = [
+        { top: "#ffd700", bottom: "#a0d8ef" }, // Stage 1
+        { top: "#ffed4a", bottom: "#a5e1f5" }, // Stage 2
+        { top: "#ffdf5e", bottom: "#ade4f7" }, // Stage 3
+        { top: "#ffcc66", bottom: "#bce9f9" }, // Stage 4
+        { top: "#ff9966", bottom: "#ccefff" }, // Stage 5
+        { top: "#ff7f50", bottom: "#d6f2ff" }, // Stage 6
+        { top: "#ff6347", bottom: "#87ceeb" }, // Stage 7
+        { top: "#ff4500", bottom: "#4682b4" }, // Stage 8
+        { top: "#db7093", bottom: "#2f4f4f" }, // Stage 9
+        { top: "#4b0082", bottom: "#191970" }  // Stage 10
+    ];
+
+    const STAGES = [
+        { name: "黄金の昼下がり", symbol: "👱🏻‍♀️", panels: ['👱🏻‍♀️', '🌸', '📖', '🌳', '🦋', '🐈', '🐇'], startText: "「なんて退屈な午後かしら。絵のない本なんて、何の役にも立たないわ。」", clearText: "あら、服を着たウサギが走っていくわ！追いかけなきゃ！", quotes: [{ s: "👱🏻‍♀️", t: "「お姉さまの本には、絵も会話もないのね。」" }] },
+        { name: "ウサギの穴へ落下", symbol: "🕳️", panels: ['🕳️', '🕰️', '📖', '🗺️', '🚪', '🗝️', '🐇'], startText: "アリスは深い穴を落ちていきます。周りには不思議なものがたくさん浮いています。", clearText: "やっと地面に着いたわ。小さな鍵を見つけたけれど、どこに使うのかしら？", quotes: [{ s: "👱🏻‍♀️", t: "「いつまで落ちるのかしら。地球を突き抜けちゃう？」" }] },
+        { name: "涙の池", symbol: "💧", panels: ['💧', '🐭', '🦆', '🐤', '🫙', '🧤', '🛶'], startText: "泣きすぎて部屋が涙の池になっちゃった！動物たちと一緒に泳いで岸を目指しましょう。", clearText: "ふぅ、なんとか岸にたどり着いたわ。みんなびしょ濡れね。", quotes: [{ s: "🐭", t: "「そんなにバシャバシャしないでくれ！」" }] },
+        { name: "白ウサギの家", symbol: "🏠", panels: ['🏠', '🍰', '🍼', '👞', '🥕', '🪟', '🧤'], startText: "ウサギさんの家でケーキを食べたら、腕も足も窓から突き出すほど大きくなっちゃった！", clearText: "魔法のクッキーでなんとか元の大きさに戻れたわ。急いで逃げなきゃ！", quotes: [{ s: "🐇", t: "「メアリー・アン！私の手袋はどこだ！」" }] },
+        { name: "イモムシの助言", symbol: "🐛", panels: ['🐛', '🍄', '🕸️', '🚬', '🪨', '🌲', '🌿'], startText: "森の中で出会ったのは、巨大なキノコの上で水タバコを吹かすイモムシさんでした。", clearText: "「片側で背が伸び、反対側で縮む」。キノコの秘密を教わったわ。", quotes: [{ s: "🐛", t: "「お前は...だぁれだ？」" }] },
+        { name: "公爵夫人の台所", symbol: "🍳", panels: ['🍳', '🥣', '🧂', '🐖', '👩‍🍳', '🐟', '😸'], startText: "コショウが舞い散るひどい台所！赤ちゃんはブーブー鳴くし、料理人は怒っているわ。", clearText: "赤ちゃんが豚になっちゃった。そして、木の上にニヤニヤ笑う猫が...。", quotes: [{ s: "👩‍🍳", t: "「もっとコショウを入れろ！スープが足りない！」" }] },
+        { name: "狂ったお茶会", symbol: "🎩", panels: ['🎩', '☕', '🫖', '🍪', '🐭', '🕒', '🐇'], startText: "「席はないぞ！」と言われちゃった。三月ウサギと帽子屋の狂ったお茶会です。", clearText: "なんて失礼なお茶会！もう二度と来るものですか！", quotes: [{ s: "🎩", t: "「カラスと書き物机が似ているのはなぜだ？」" }] },
+        { name: "女王のバラの庭", symbol: "🌹", panels: ['🌹', '🤍', '🖌️', '♠️', '♣️', '💎', '👑'], startText: "トランプの兵隊さんたちが、白いバラを必死に赤く塗っています。女王様が来る前に！", clearText: "「赤く塗れ！赤く塗れ！」...あ、女王様がいらっしゃったわ！", quotes: [{ s: "♠️", t: "「間違えて白を植えたら首をはねられちまう！」" }] },
+        { name: "女王のクロケー場", symbol: "♥️", panels: ['♥️', '🦩', '🦔', '👑', '🏰', '🚩', '⚔️'], startText: "理不尽なクロケー大会。フラミンゴがマレットで、ハリネズミがボールよ！", clearText: "みんな自分の首を守るのに必死ね。アリスも逃げ出さなきゃ！", quotes: [{ s: "♥️", t: "「あいつの首をはねろ！(Off with her head!)」" }] },
+        { name: "最後の裁判と目覚め", symbol: "⚖️", panels: ['🥧', '⚖️', '📜', '🎺', '🃏', '👱🏻‍♀️', '⚔️'], startText: "ハートのタルトを盗んだのは誰？ 裁判が始まったけれど、みんなただのトランプだわ！", clearText: "「あんたたちなんてトランプの束じゃない！」...あ、お姉ちゃんの膝の上だったわ。", quotes: [{ s: "⚖️", t: "「判決が先だ！審議は後回しにしろ！」" }, { s: "👱🏻‍♀️", t: "「私はもう大きくなったわ。あなたたちは怖くない！」" }], isFinal: true }
+    ];
+
+    let currentStage = 0;
+    let timeLeft = 60;
+    let score = 0;
+    let hintCount = 3;
+    let removedTotal = 0;
+    let isGameFinished = false; 
+    let isProcessing = false;
+    let dragStart = null;
+    let gameInterval = null;
+    let quoteInterval = null;
+    let typingTimer = null;
+    let fullText = "";
+    let missions = {};
+    let board = [];
+    let giftPositions = []; 
+    const GIFT_THRESHOLD = 30;
+
+    const storyOverlay = document.getElementById('story-overlay');
+    const mainBtn = document.getElementById('main-action-btn');
+    const retryBtn = document.getElementById('retry-btn');
+    const storyText = document.getElementById('story-text');
+    const instructionArea = document.getElementById('instruction-area');
+    const gameScreen = document.getElementById('game-screen');
+    const boardEl = document.getElementById('board');
+    const timerBar = document.getElementById('timer-bar');
+    const timeText = document.getElementById('time-left-val');
+    const scoreText = document.getElementById('score-num');
+    const storyIcon = document.getElementById('story-icon');
+    const storyTitle = document.getElementById('story-title');
+
+    window.onload = () => {
+        updateBackground();
+        showTitleScreen();
+        mainBtn.onclick = onMainButtonClick;
+        retryBtn.onclick = onRetryButtonClick;
+        document.getElementById('hint-btn').onclick = useHint;
+
+        boardEl.addEventListener('mousedown', onStart);
+        boardEl.addEventListener('touchstart', (e) => { e.preventDefault(); onStart(e.touches[0]); }, {passive: false});
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', (e) => { if(storyOverlay.style.display !== 'flex') onMove(e.touches[0]); }, {passive: false});
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchend', onEnd);
+    };
+
+    function updateBackground() {
+        const colors = BG_TIME_COLORS[currentStage] || BG_TIME_COLORS[0];
+        document.body.style.setProperty('--bg-top', colors.top);
+        document.body.style.setProperty('--bg-bottom', colors.bottom);
+    }
+
+    function showTitleScreen() {
+        gameScreen.style.visibility = 'hidden';
+        storyOverlay.style.display = 'flex';
+        storyTitle.innerText = "不思議の国のアリス";
+        storyText.innerText = "〜物語のパズル〜";
+        storyIcon.innerText = "🍄";
+        instructionArea.innerHTML = "パネルを揃えて、物語のアイテムを集めましょう。<br>ギフトパネル🎁は、盤面の1種類を全て消去します！";
+        mainBtn.innerText = "ゲームを始める";
+    }
+
+    function setupOverlay(isClear) {
+        gameScreen.style.visibility = 'hidden';
+        storyOverlay.style.display = 'flex';
+        clearInterval(quoteInterval);
+        const stageData = STAGES[currentStage];
+        retryBtn.style.display = 'none';
+        
+        if (isClear) {
+            saveGiftPositions();
+            storyTitle.innerText = "Stage Clear!";
+            storyTitle.classList.add('celebrate-text');
+            storyIcon.innerText = "✨";
+            createConfetti();
+            if (currentStage === STAGES.length - 1) {
+                mainBtn.innerText = "最初から遊ぶ";
+                fullText = "おめでとう！あなたは全ての不思議を解き明かしました。\n最終スコア: " + score;
+            } else {
+                mainBtn.innerText = "次のステージへ";
+                fullText = stageData.clearText;
+            }
+        } else if (timeLeft <= 0) {
+            storyTitle.innerText = "Game Over";
+            storyIcon.innerText = "🥀";
+            fullText = "アリスは迷子になってしまったようです…。";
+            mainBtn.innerText = "タイトルへ戻る";
+            retryBtn.style.display = 'block';
+        } else {
+            storyTitle.innerText = `Stage ${currentStage + 1}`;
+            storyTitle.classList.remove('celebrate-text');
+            storyIcon.innerText = stageData.symbol;
+            fullText = stageData.startText;
+            mainBtn.innerText = "物語を始める";
+        }
+        typeEffect(fullText);
+    }
+
+    function saveGiftPositions() {
+        giftPositions = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (board[r][c] === '🎁') {
+                    giftPositions.push({ r, c });
+                }
+            }
+        }
+    }
+
+    function typeEffect(text) {
+        clearInterval(typingTimer);
+        storyText.innerText = "";
+        let i = 0;
+        typingTimer = setInterval(() => {
+            if (i < text.length) { storyText.innerText += text.charAt(i); i++; }
+            else { clearInterval(typingTimer); }
+        }, 30);
+    }
+
+    function onMainButtonClick() {
+        if (storyText.innerText.length < fullText.length) {
+            clearInterval(typingTimer);
+            storyText.innerText = fullText;
+            return;
+        }
+
+        const btnText = mainBtn.innerText;
+        if (btnText === "次のステージへ") {
+            currentStage++;
+            updateBackground();
+            timeLeft = 60;
+            isGameFinished = false;
+            setupOverlay(false); // 次のステージの「開始画面」を表示
+        } else if (btnText === "タイトルへ戻る" || btnText === "最初から遊ぶ") {
+            currentStage = 0; timeLeft = 60; score = 0; scoreText.innerText = "0";
+            giftPositions = [];
+            updateBackground();
+            showTitleScreen();
+        } else if (btnText === "物語を始める" || btnText === "ゲームを始める") {
+            startGame();
+        }
+    }
+
+    function onRetryButtonClick() {
+        timeLeft = 60; score = 0; scoreText.innerText = "0";
+        giftPositions = [];
+        startGame();
+    }
+
+    function startGame() {
+        storyOverlay.style.display = 'none';
+        gameScreen.style.visibility = 'visible';
+        hintCount = 3; removedTotal = 0; isGameFinished = false;
+        updateHintBtn();
+        initMissions();
+        initBoard();
+        startTimer();
+        startQuotes();
+    }
+
+    function startQuotes() {
+        updateQuote();
+        clearInterval(quoteInterval);
+        quoteInterval = setInterval(updateQuote, 4000);
+    }
+
+    function updateQuote() {
+        const stage = STAGES[currentStage];
+        const quoteObj = stage.quotes[Math.floor(Math.random() * stage.quotes.length)];
+        document.getElementById('speaker-emoji').innerText = quoteObj.s;
+        document.getElementById('quote-text').innerText = quoteObj.t;
+    }
+
+    function startTimer() {
+        clearInterval(gameInterval);
+        gameInterval = setInterval(() => {
+            if (storyOverlay.style.display === 'flex') return;
+            timeLeft -= 0.1;
+            if (timeLeft <= 0) { timeLeft = 0; gameOver(); }
+            updateTimerUI();
+        }, 100);
+    }
+
+    function updateTimerUI() {
+        const p = (timeLeft / 60) * 100;
+        timerBar.style.width = p + "%";
+        timeText.innerText = Math.ceil(timeLeft);
+    }
+
+    function getPanelColor(emoji) {
+        const panels = STAGES[currentStage].panels;
+        const index = panels.indexOf(emoji);
+        if (emoji === '🎁') return 'var(--gift-pink)';
+        return index !== -1 ? COLOR_PALETTE[index % COLOR_PALETTE.length] : '#fff';
+    }
+
+    function initMissions() {
+        const stage = STAGES[currentStage];
+        const list = document.getElementById('mission-list');
+        list.innerHTML = '';
+        missions = {};
+        
+        let targets;
+        if (stage.isFinal) {
+            targets = ['🥧', '📜', '👱🏻‍♀️'];
+        } else {
+            targets = [stage.panels[0], stage.panels[stage.panels.length-1]];
+        }
+        
+        targets.forEach(emoji => {
+            missions[emoji] = 12;
+            const item = document.createElement('div');
+            item.className = 'mission-item';
+            item.id = 'mission-' + emoji;
+            item.style.backgroundColor = getPanelColor(emoji);
+            item.innerHTML = `<span>${emoji}</span>: <span class="m-count">${missions[emoji]}</span>`;
+            list.appendChild(item);
+        });
+        document.getElementById('stage-name').innerText = stage.name;
+        document.getElementById('stage-num-label').innerText = `Stage ${currentStage + 1}`;
+    }
+
+    function initBoard() {
+        const panels = STAGES[currentStage].panels;
+        boardEl.innerHTML = '';
+        board = [];
+        for (let r = 0; r < 8; r++) {
+            board[r] = [];
+            for (let c = 0; c < 8; c++) {
+                const isGiftPos = giftPositions.some(pos => pos.r === r && pos.c === c);
+                if (isGiftPos) {
+                    board[r][c] = '🎁';
+                    continue;
+                }
+                let p;
+                do { p = panels[Math.floor(Math.random() * panels.length)]; }
+                while ((r >= 2 && board[r-1][c] === p && board[r-2][c] === p) || (c >= 2 && board[r][c-1] === p && board[r][c-2] === p));
+                board[r][c] = p;
+            }
+        }
+        render(true);
+    }
+
+    function render(isFullInit = false) {
+        if (isFullInit) boardEl.innerHTML = '';
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                let t = document.getElementById(`tile-${r}-${c}`);
+                if (isFullInit && !t) {
+                    t = document.createElement('div');
+                    t.id = `tile-${r}-${c}`;
+                    t.dataset.r = r; t.dataset.c = c;
+                    boardEl.appendChild(t);
+                }
+                const p = board[r][c];
+                t.innerText = p || "";
+                t.className = 'tile';
+                t.style.backgroundColor = getPanelColor(p);
+                if(p === '🎁') t.classList.add('gift-panel');
+                else t.classList.remove('gift-panel');
+            }
+        }
+        updateGlow();
+    }
+
+    function updateGlow() {
+        const activeMissions = Object.keys(missions).filter(k => missions[k] > 0);
+        const allTiles = document.querySelectorAll('.tile');
+        allTiles.forEach(t => t.classList.remove('last-target-glow'));
+        if (activeMissions.length === 1) {
+            allTiles.forEach(t => { if (t.innerText === activeMissions[0]) t.classList.add('last-target-glow'); });
+        }
+    }
+
+    function onStart(e) {
+        if (isProcessing || isGameFinished) return;
+        const t = e.target.closest('.tile');
+        if (!t) return;
+        document.querySelectorAll('.hint-highlight').forEach(el => el.classList.remove('hint-highlight'));
+        if (t.innerText === '🎁') { useGift(parseInt(t.dataset.r), parseInt(t.dataset.c)); return; }
+        dragStart = { r: parseInt(t.dataset.r), c: parseInt(t.dataset.c), x: e.clientX || e.pageX, y: e.clientY || e.pageY, el: t };
+        t.classList.add('selected');
+    }
+
+    async function useGift(r, c) {
+        isProcessing = true;
+        const currentTypes = [...new Set(board.flat())].filter(p => p && p !== '🎁');
+        if (currentTypes.length === 0) { isProcessing = false; return; }
+        const targetType = currentTypes[Math.floor(Math.random() * currentTypes.length)];
+        board[r][c] = null;
+        document.getElementById(`tile-${r}-${c}`).classList.add('eliminating');
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if (board[i][j] === targetType) {
+                    if (missions[targetType] !== undefined && missions[targetType] > 0) missions[targetType]--;
+                    score += 15; board[i][j] = null;
+                    document.getElementById(`tile-${i}-${j}`).classList.add('eliminating');
+                }
+            }
+        }
+        scoreText.innerText = score; updateMissionUI();
+        await new Promise(res => setTimeout(res, 400));
+        dropTiles(); render(); await processMatches();
+    }
+
+    function onMove(e) {
+        if (!dragStart || isProcessing || isGameFinished) return;
+        const curX = e.clientX || e.pageX; const curY = e.clientY || e.pageY;
+        const dx = curX - dragStart.x; const dy = curY - dragStart.y;
+        if (Math.abs(dx) > 25 || Math.abs(dy) > 25) {
+            let tr = dragStart.r, tc = dragStart.c;
+            if (Math.abs(dx) > Math.abs(dy)) tc += dx > 0 ? 1 : -1;
+            else tr += dy > 0 ? 1 : -1;
+            if (tr >= 0 && tr < 8 && tc >= 0 && tc < 8) {
+                const r1 = dragStart.r, c1 = dragStart.c;
+                dragStart.el.classList.remove('selected'); dragStart = null;
+                handleSwap(r1, c1, tr, tc);
+            }
+        }
+    }
+
+    function onEnd() { if (dragStart) { dragStart.el.classList.remove('selected'); dragStart = null; } }
+
+    async function handleSwap(r1, c1, r2, c2) {
+        isProcessing = true;
+        const p1 = board[r1][c1], p2 = board[r2][c2];
+        board[r1][c1] = p2; board[r2][c2] = p1; render();
+        const matches = findMatches();
+        if (matches.length > 0) { await processMatches(); }
+        else { await new Promise(res => setTimeout(res, 200)); board[r1][c1] = p1; board[r2][c2] = p2; render(); isProcessing = false; }
+    }
+
+    function findMatches() {
+        let m = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 6; c++) {
+                if (board[r][c] && board[r][c] !== '🎁' && board[r][c] === board[r][c+1] && board[r][c] === board[r][c+2]) m.push({r,c}, {r,c:c+1}, {r,c:c+2});
+            }
+        }
+        for (let c = 0; c < 8; c++) {
+            for (let r = 0; r < 6; r++) {
+                if (board[r][c] && board[r][c] !== '🎁' && board[r][c] === board[r+1][c] && board[r][c] === board[r+2][c]) m.push({r,c}, {r:r+1,c}, {r:r+2,c});
+            }
+        }
+        return m.filter((v, i, a) => a.findIndex(t => t.r === v.r && t.c === v.c) === i);
+    }
+
+    async function processMatches() {
+        if (isGameFinished) return;
+        let matches = findMatches();
+        while (matches.length > 0) {
+            matches.forEach(pos => {
+                const p = board[pos.r][pos.c];
+                if (p) {
+                    if (missions[p] !== undefined && missions[p] > 0) missions[p]--;
+                    score += 10; removedTotal++;
+                    document.getElementById(`tile-${pos.r}-${pos.c}`).classList.add('eliminating');
+                    board[pos.r][pos.c] = null;
+                }
+            });
+            if (removedTotal >= GIFT_THRESHOLD) { removedTotal -= GIFT_THRESHOLD; spawnGift(); }
+            scoreText.innerText = score; updateMissionUI();
+            await new Promise(res => setTimeout(res, 350));
+            dropTiles(); render();
+            await new Promise(res => setTimeout(res, 200));
+            matches = findMatches();
+        }
+        checkClearStatus(); isProcessing = false;
+    }
+
+    function checkClearStatus() {
+        if (!isGameFinished && Object.values(missions).every(v => v <= 0)) {
+            isGameFinished = true; clearInterval(gameInterval);
+            setTimeout(() => setupOverlay(true), 500);
+        }
+    }
+
+    function spawnGift() {
+        let r, c; do { r = Math.floor(Math.random() * 8); c = Math.floor(Math.random() * 8); } while (board[r][c] === '🎁');
+        board[r][c] = '🎁';
+    }
+
+    function dropTiles() {
+        const panels = STAGES[currentStage].panels;
+        for (let c = 0; c < 8; c++) {
+            let empty = 0;
+            for (let r = 7; r >= 0; r--) {
+                if (board[r][c] === null) empty++;
+                else if (empty > 0) { board[r+empty][c] = board[r][c]; board[r][c] = null; }
+            }
+            for (let r = 0; r < empty; r++) { board[r][c] = panels[Math.floor(Math.random() * panels.length)]; }
+        }
+    }
+
+    function updateMissionUI() {
+        for (const emoji in missions) {
+            const el = document.getElementById('mission-' + emoji);
+            if (el) el.querySelector('.m-count').innerText = Math.max(0, missions[emoji]);
+        }
+    }
+
+    function updateHintBtn() {
+        const b = document.getElementById('hint-btn');
+        b.innerText = `💡 ヒント (${hintCount})`;
+        b.disabled = hintCount <= 0;
+    }
+
+    function useHint() {
+        if (hintCount <= 0 || isProcessing || isGameFinished) return;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (c < 7 && checkPotentialMatch(r, c, r, c + 1)) { highlight(r, c, r, c + 1); hintCount--; updateHintBtn(); return; }
+                if (r < 7 && checkPotentialMatch(r, c, r + 1, c)) { highlight(r, c, r + 1, c); hintCount--; updateHintBtn(); return; }
+            }
+        }
+    }
+
+    function checkPotentialMatch(r1, c1, r2, c2) {
+        const p1 = board[r1][c1]; const p2 = board[r2][c2];
+        if (!p1 || !p2 || p1 === '🎁' || p2 === '🎁' || p1 === p2) return false;
+        board[r1][c1] = p2; board[r2][c2] = p1;
+        const m = findMatches();
+        board[r1][c1] = p1; board[r2][c2] = p2;
+        return m.length > 0;
+    }
+
+    function highlight(r1, c1, r2, c2) {
+        const t1 = document.getElementById(`tile-${r1}-${c1}`);
+        const t2 = document.getElementById(`tile-${r2}-${c2}`);
+        t1.classList.add('hint-highlight'); t2.classList.add('hint-highlight');
+        setTimeout(() => { t1.classList.remove('hint-highlight'); t2.classList.remove('hint-highlight'); }, 3000);
+    }
+
+    function createConfetti() {
+        for (let i = 0; i < 30; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            c.style.animationDelay = Math.random() * 2 + 's';
+            storyOverlay.appendChild(c);
+            setTimeout(() => c.remove(), 3000);
+        }
+    }
+
+    function gameOver() { clearInterval(gameInterval); clearInterval(quoteInterval); setupOverlay(false); }
+</script>
+
+</body>
+</html>
+
